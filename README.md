@@ -21,7 +21,7 @@ They do not answer:
 - **What changed in the data batch?**
 - **What should be done next to fix it?**
 
-DataOps Agent closes the operational loop by automated error diagnosis and remediation planning.
+DataOps Agent closes the operational loop by automated error diagnosis, human-approved remediation planning, and recovery verification.
 
 ---
 
@@ -36,30 +36,40 @@ Many data engineering projects focus purely on generic streaming pipelines, dash
 
 ---
 
-## 4. Architecture Overview
+## 4. End-to-End Closed-Loop Architecture
 
 ```text
-                    DATA PLATFORM
-
-Sources (E-Commerce Sample JSON Datasets)
-   ↓
-dlt Ingestion
-   ↓
-PostgreSQL Raw Layer (raw_data)
-   ↓
-dbt Layer (staging → intermediate → marts)
-   ↓
-Dagster Orchestrator (Assets, Lineage, Asset Checks)
-   ↓
-Health Signals (Normalized Signal Layer & Evidence Collectors)
-   ↓
-Diagnosis Engine (Deterministic Rule-Based Diagnosis)
-   ↓
-MCP SERVER (17 Read-Only MCP Tools)
-   ↓
-MCP CLIENT (Tool Discovery & Execution)
-   ↓
-LLM DATAOPS AGENT (Evidence-Based Investigation & Recommendation)
+┌─────────────────────────────────────────────────────┐
+│                  DATA SOURCES                       │
+└───────────────────────┬─────────────────────────────┘
+                        ↓
+                       dlt Ingestion
+                        ↓
+                   PostgreSQL Raw Layer (raw_data)
+                        ↓
+                       dbt Layer (staging → intermediate → marts)
+                        ↓
+                    Dagster Orchestrator (Assets & Checks)
+                        ↓
+              Health Signals & Evidence Collectors
+                        ↓
+                    Incident System
+                        ↓
+                 MCP Server (22 Read-Only & Proposal Tools)
+                        ↓
+                MCP Client (Tool Calling & Discovery)
+                        ↓
+              LLM DataOps Agent (Diagnosis & Planning)
+                        ↓
+               Action Validator (Allowlist & Safety Checks)
+                        ↓
+                HUMAN APPROVAL GATE
+                        ↓
+               Remediation Engine (Allowlisted Execution)
+                        ↓
+              Recovery Verification (dbt & Dagster Checks)
+                        ↓
+                INCIDENT RESOLVED
 ```
 
 ---
@@ -73,8 +83,9 @@ LLM DATAOPS AGENT (Evidence-Based Investigation & Recommendation)
 - **Observability & Diagnosis**: Python, `pydantic`, `click` CLI
 - **Tool Protocol**: Model Context Protocol (MCP SDK, stdio transport)
 - **Agentic Framework**: Python, Configurable LLM Providers (`LLMProvider` abstraction with `FakeLLMProvider` for deterministic testing and `OpenAILLMProvider` for live model execution)
+- **Remediation Engine**: Allowlisted actions (`rerun_dagster_asset`, `quarantine_invalid_records`, `refresh_dbt_model`), human approval gate, TTL expiration, audit logger, and recovery verifier.
 - **Infrastructure**: Docker, Docker Compose
-- **Testing**: `pytest`
+- **Testing**: `pytest` (58 unit, integration, and safety tests)
 
 ---
 
@@ -82,20 +93,18 @@ LLM DATAOPS AGENT (Evidence-Based Investigation & Recommendation)
 
 ```
 .
-├── agent/                  # AI DataOps Agent
+├── remediation/            # Human-Approved Remediation & Recovery Verification Engine
 │   ├── __init__.py
-│   ├── agent.py            # Core investigation loop & budget management
-│   ├── client.py           # DataOpsMCPClient connecting to MCP tools
-│   ├── cli.py              # dataops-agent CLI commands (investigate, tools, health)
-│   ├── models.py           # AgentState & AgentDiagnosis Pydantic models
-│   ├── prompts.py          # SYSTEM_DATAOPS_AGENT_PROMPT & safety rules
-│   ├── provider.py         # LLMProvider abstraction & FakeLLMProvider
-│   └── tracing.py          # InvestigationTrace step recorder
-├── mcp/                    # Model Context Protocol (MCP) Server
-│   ├── context.py          # Shared application context & database pool
-│   ├── schemas.py          # Pydantic schemas for 17 MCP tools
-│   ├── server.py           # FastMCP stdio server implementation
-│   └── tools/              # Categorized MCP tools (Dagster, dbt, Incidents, Database, Ingestion)
+│   ├── actions.py          # Allowlisted actions (rerun_asset, quarantine_records, refresh_dbt)
+│   ├── approval.py         # ApprovalService (TTL expiration & self-approval prevention)
+│   ├── audit.py            # Immutable AuditLogger & AuditEvent recorder
+│   ├── executor.py         # RemediationExecutor with dry-run support
+│   ├── models.py           # RemediationPlan & RemediationAction Pydantic models
+│   ├── planner.py          # RemediationPlanner converting diagnosis into plans
+│   ├── validator.py        # RemediationValidator enforcing safety rules
+│   └── verifier.py         # RecoveryVerifier evaluating pipeline recovery
+├── agent/                  # AI DataOps Agent (Investigation & Reasoning)
+├── mcp/                    # Model Context Protocol (MCP) Server (22 Tools)
 ├── failure_injection/      # Failure Injection Framework (5 deterministic scenarios)
 ├── health/                 # Health Signal Layer & Evidence Collectors
 ├── diagnosis/              # Deterministic Rule-Based Diagnosis Engine
@@ -104,8 +113,8 @@ LLM DATAOPS AGENT (Evidence-Based Investigation & Recommendation)
 ├── dbt/                    # dbt project (staging, intermediate, marts & tests)
 ├── dagster/                # Dagster orchestration framework & asset checks
 ├── data/sample/            # E-commerce JSON sample datasets
-├── docs/                   # Platform & MCP tool documentation
-├── tests/                  # Pytest test suite (49 unit, integration & safety tests)
+├── docs/                   # Platform, MCP tool & audit documentation
+├── tests/                  # Pytest test suite (58 unit, integration & safety tests)
 ├── docker-compose.yml      # Containerized Postgres & Dagster setup
 ├── Dockerfile              # Container definition
 ├── pyproject.toml          # Project dependencies & build config
@@ -115,78 +124,90 @@ LLM DATAOPS AGENT (Evidence-Based Investigation & Recommendation)
 
 ---
 
-## 7. AI DataOps Agent
+## 7. Model Context Protocol (MCP) Layer
 
-The **AI DataOps Agent** operates as an autonomous operational data engineer investigating pipeline incidents through MCP tools.
+The platform provides a complete **MCP Tool Server** exposing 22 standardized tools over standard I/O (`stdio`):
 
-### Why the Agent Uses MCP
-The agent communicates strictly through the MCP Client layer. Direct infrastructure access (raw SQL queries, shell commands, file modifications, or direct Dagster/dbt mutations) is disabled by design. This guarantees strict read-only governance and decoupled architecture.
+| Category | Tools | Access Level |
+|---|---|---|
+| **Dagster** | `get_failed_assets`, `get_asset_status`, `get_asset_lineage`, `get_recent_runs`, `get_asset_checks` | Read-Only |
+| **dbt** | `get_dbt_test_results`, `get_dbt_model_status`, `get_failed_dbt_tests` | Read-Only |
+| **Incidents** | `list_incidents`, `get_incident`, `get_incident_evidence`, `get_diagnosis` | Read-Only |
+| **Database** | `get_table_stats`, `get_column_stats`, `get_recent_data_quality_stats` | Read-Only (Restricted) |
+| **Ingestion** | `get_ingestion_status`, `get_ingestion_metadata` | Read-Only |
+| **Remediation Proposals** | `propose_remediation`, `validate_remediation`, `get_remediation_plan`, `get_remediation_status`, `get_verification_result` | Read-Only / Proposal |
 
-### Investigation Lifecycle
-1. **Receive Incident**: Initiates investigation loop with incident ID.
-2. **Tool Discovery**: MCP client dynamically connects to MCP server and retrieves available tool definitions.
-3. **Evidence-Based Investigation**: The agent reasons over missing evidence, selecting appropriate tools (e.g. `get_failed_assets`, `get_failed_dbt_tests`, `get_asset_lineage`, `get_column_stats`).
-4. **Facts vs Inferences**: Observed tool results are classified as facts, separate from model inferences and hypothesis statements.
-5. **Confidence Calculation**: Evidence agreement computes confidence levels (`HIGH`, `MEDIUM`, `LOW`).
-6. **Structured Diagnosis**: Produces an auditable report detailing root cause, impact, observed facts, and recommended actions.
-7. **Safety Boundary (Execution Halt)**: The agent halts before executing any remediation, requiring explicit human operator approval.
-
----
-
-## 8. Development Roadmap
-
-### Phase 4 — Implemented
-- [x] Configurable `LLMProvider` abstraction (`FakeLLMProvider` & `OpenAILLMProvider`)
-- [x] MCP Client integration & tool discovery
-- [x] Tool-calling investigation loop
-- [x] Step and tool-call budget limits (`MAX_TOOL_CALLS=15`, `MAX_INVESTIGATION_STEPS=10`)
-- [x] Evidence-based root-cause diagnosis & impact analysis
-- [x] Investigation step tracing (`InvestigationTrace`)
-- [x] Safety boundaries (Read-only enforcement, write execution blocked)
-
-### Phase 5 — Planned
-- [ ] Human-in-the-loop approval workflow
-- [ ] Controlled remediation execution (quarantines, dbt model reruns, source batch backfills)
-- [ ] Post-remediation recovery verification
-
----
-
-## 9. How to Run Locally
-
-### Step 1: Environment Setup
+Start the MCP Server locally:
 ```bash
-cp .env.example .env
+dataops mcp start
+# Or:
+python -m mcp.server
 ```
 
-### Step 2: Start PostgreSQL Container
+---
+
+## 8. Human-Approved Remediation & Recovery Verification
+
+### Why Autonomous Remediation is Dangerous
+Unrestricted AI agents with write access to production data platforms risk executing destructive SQL, dropping active tables, or launching runaway backfills.
+
+### Safety Boundaries Enforced
+1. **Zero Direct Write Access**: The AI Agent cannot execute arbitrary SQL (`execute_sql`), shell commands, or unapproved scripts.
+2. **Allowlisted Actions ONLY**: Execution is restricted strictly to explicit actions:
+   - `rerun_dagster_asset`
+   - `quarantine_invalid_records` (Idempotent quarantine table insertion without deleting source records)
+   - `refresh_dbt_model`
+3. **Human Approval Gate**: The AI Agent CANNOT approve its own plan. Human operator approval is mandatory via CLI or API.
+4. **Approval TTL Expiration**: Approvals expire after 30 minutes (`REMEDIATION_APPROVAL_TTL_MINUTES=30`). Expired approvals cannot execute.
+5. **Recovery Verification Gate**: Incidents only transition to `RESOLVED` after automated recovery verification checks (`Verifier`) confirm dbt test assertions pass and asset failures drop to 0.
+
+---
+
+## 9. How to Run the End-to-End Closed-Loop Workflow
+
+### Step 1: Environment Setup & Postgres
 ```bash
+cp .env.example .env
 make up
 ```
 
-### Step 3: Run Ingestion & Transformations
+### Step 2: Run Ingestion & Transformations
 ```bash
 python -m ingestion.pipeline
 make dbt-run
 make dbt-test
 ```
 
-### Step 4: Inject Failure & Run AI DataOps Agent
+### Step 3: Inject Data Quality Failure
 ```bash
-# Inject failure scenario
 dataops inject --scenario null_customer_id
+```
 
-# Check agent health & discovered tools
-dataops agent health
-dataops agent tools
-
-# Run AI Agent investigation
+### Step 4: Run AI Agent Investigation & Remediation Proposal
+```bash
 dataops agent investigate inc_b91673ef
+# Note the generated Remediation Plan ID (e.g. plan_292b1398)
+```
 
-# Reset pipeline to healthy
+### Step 5: Inspect, Approve, Execute & Verify Recovery
+```bash
+# 1. Inspect proposed plan
+dataops-agent remediation inspect plan_292b1398
+
+# 2. Human Operator Approves Plan
+dataops-agent remediation approve plan_292b1398 --approver OPERATOR_JANE
+
+# 3. Execute Controlled Remediation Action
+dataops-agent remediation execute plan_292b1398
+
+# 4. Verify Recovery & Resolve Incident
+dataops-agent remediation verify plan_292b1398
+
+# 5. Reset pipeline state to healthy
 dataops reset
 ```
 
-### Step 5: Run Pytest Suite
+### Step 6: Run Pytest Suite
 ```bash
 make test
 # Or: .venv/bin/pytest tests/ -v

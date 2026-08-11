@@ -44,6 +44,13 @@ from mcp.tools.ingestion import (
     get_ingestion_status_tool,
     get_ingestion_metadata_tool
 )
+from mcp.tools.remediation import (
+    propose_remediation_tool,
+    validate_remediation_tool,
+    get_remediation_plan_tool,
+    get_remediation_status_tool,
+    get_verification_result_tool
+)
 
 logger = logging.getLogger("dataops.mcp.server")
 
@@ -173,6 +180,42 @@ def get_ingestion_status() -> Dict[str, Any]:
 )
 def get_ingestion_metadata() -> Dict[str, Any]:
     return get_ingestion_metadata_tool()
+
+# --- Register Remediation Proposal Tools ---
+@app.tool(
+    name="propose_remediation",
+    description="Proposes a structured remediation plan for an incident based on AI Agent diagnosis recommendations. The plan is registered in PENDING_APPROVAL status for human review."
+)
+def propose_remediation(incident_id: str) -> Dict[str, Any]:
+    return propose_remediation_tool(incident_id)
+
+@app.tool(
+    name="validate_remediation",
+    description="Validates a proposed remediation plan against safety rules, allowlists, and idempotency guarantees."
+)
+def validate_remediation(plan_id: str) -> Dict[str, Any]:
+    return validate_remediation_tool(plan_id)
+
+@app.tool(
+    name="get_remediation_plan",
+    description="Retrieves the complete remediation plan object by plan_id."
+)
+def get_remediation_plan(plan_id: str) -> Dict[str, Any]:
+    return get_remediation_plan_tool(plan_id)
+
+@app.tool(
+    name="get_remediation_status",
+    description="Returns the current status, approval metadata, and execution result for a remediation plan."
+)
+def get_remediation_status(plan_id: str) -> Dict[str, Any]:
+    return get_remediation_status_tool(plan_id)
+
+@app.tool(
+    name="get_verification_result",
+    description="Retrieves the post-execution recovery verification result for a remediation plan."
+)
+def get_verification_result(plan_id: str) -> Dict[str, Any]:
+    return get_verification_result_tool(plan_id)
 
 
 def start_server():
