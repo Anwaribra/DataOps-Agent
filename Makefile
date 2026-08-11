@@ -1,4 +1,4 @@
-.PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose mcp agent-investigate agent-tools agent-health remediation-list remediation-approve remediation-execute remediation-verify
+.PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose mcp agent-investigate agent-tools agent-health remediation-list remediation-approve remediation-execute remediation-verify web-dev web-build
 
 help:
 	@echo "Available commands:"
@@ -20,6 +20,8 @@ help:
 	@echo "  make remediation-approve - Approve remediation plan (PLAN=plan_id)"
 	@echo "  make remediation-execute - Execute approved remediation plan (PLAN=plan_id)"
 	@echo "  make remediation-verify  - Verify pipeline recovery (PLAN=plan_id)"
+	@echo "  make web-dev             - Run interactive Next.js demo website in dev mode"
+	@echo "  make web-build           - Build production Next.js demo website"
 	@echo "  make build               - Build Docker containers"
 	@echo "  make clean               - Clean cache and temporary build files"
 
@@ -77,10 +79,16 @@ remediation-execute:
 remediation-verify:
 	python3 -m agent.cli remediation verify $(PLAN)
 
+web-dev:
+	cd web && npm run dev
+
+web-build:
+	cd web && npm run build
+
 build:
 	docker compose build
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	rm -rf dbt/target dbt/dbt_packages
+	rm -rf dbt/target dbt/dbt_packages web/.next
