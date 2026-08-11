@@ -1,4 +1,16 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_SECRET_KEY = process.env.NEXT_PUBLIC_API_SECRET_KEY || '';
+
+function getHeaders(extraHeaders: Record<string, string> = {}) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extraHeaders
+  };
+  if (API_SECRET_KEY) {
+    headers['X-API-Key'] = API_SECRET_KEY;
+  }
+  return headers;
+}
 
 export async function fetchSystemHealth() {
   try {
@@ -48,7 +60,7 @@ export async function approvePlanApi(incidentId: string, approver: string = 'HUM
   try {
     const res = await fetch(`${API_BASE_URL}/incidents/${incidentId}/approve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({ approver })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -62,7 +74,8 @@ export async function approvePlanApi(incidentId: string, approver: string = 'HUM
 export async function executePlanApi(incidentId: string) {
   try {
     const res = await fetch(`${API_BASE_URL}/incidents/${incidentId}/execute`, {
-      method: 'POST'
+      method: 'POST',
+      headers: getHeaders()
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
@@ -75,7 +88,8 @@ export async function executePlanApi(incidentId: string) {
 export async function verifyRecoveryApi(incidentId: string) {
   try {
     const res = await fetch(`${API_BASE_URL}/incidents/${incidentId}/verify`, {
-      method: 'POST'
+      method: 'POST',
+      headers: getHeaders()
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
@@ -89,7 +103,7 @@ export async function injectScenarioApi(scenario: string = 'null_customer_id') {
   try {
     const res = await fetch(`${API_BASE_URL}/demo/inject`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHeaders(),
       body: JSON.stringify({ scenario })
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
@@ -103,7 +117,8 @@ export async function injectScenarioApi(scenario: string = 'null_customer_id') {
 export async function resetDemoApi() {
   try {
     const res = await fetch(`${API_BASE_URL}/demo/reset`, {
-      method: 'POST'
+      method: 'POST',
+      headers: getHeaders()
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();

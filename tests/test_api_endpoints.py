@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from api.main import app
@@ -64,6 +65,26 @@ def test_api_remediation_approval_workflow():
     assert verif_res.status_code == 200
     verif_data = verif_res.json()
     assert verif_data["status"] == "PASSED"
+
+def test_api_authorization_enforcement(monkeypatch):
+    # Set secret key requirement
+    monkeypatch.setenv("API_SECRET_KEY", "super-secret-key-123")
+
+    # 1. Investigate incident for auth test
+    inv_res = client.get("/api/incidents/inc_auth_01/investigation")
+    assert inv_res.status_code == 200
+
+    # Attempt approve without key -> Expect 401
+    unauth_res = client.post("/api/incidents/inc_auth_01/approve", json={"approver": "OPERATOR_ALICE"})
+    assert unauth_res.status_code == 401
+
+    # Attempt approve with invalid key -> Expect 401
+    bad_res = client.post("/api/incidents/inc_auth_01/approve", headers={"X-API-Key": "wrong"}, json={"approver": "OPERATOR_ALICE"})
+    assert bad_res.status_code == 401
+
+    # Attempt approve with valid key -> Expect 200
+    good_res = client.post("/api/incidents/inc_auth_01/approve", headers={"X-API-Key": "super-secret-key-123"}, json={"approver": "OPERATOR_ALICE"})
+    assert good_res.status_code == 200
 
 def test_api_demo_inject_and_reset():
     # Inject failure

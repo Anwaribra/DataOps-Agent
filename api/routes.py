@@ -1,6 +1,8 @@
 import logging
+import os
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
 from agent.agent import DataOpsAgent
@@ -14,6 +16,21 @@ from remediation.verifier import verifier
 
 logger = logging.getLogger("dataops.api.routes")
 router = APIRouter()
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+def verify_authorization(x_api_key: Optional[str] = Security(api_key_header)):
+    """
+    Lightweight authorization dependency verifying X-API-Key for state-mutating endpoints.
+    Enforces API_SECRET_KEY if configured in environment variables.
+    """
+    secret_key = os.getenv("API_SECRET_KEY")
+    if secret_key:
+        if not x_api_key or x_api_key != secret_key:
+            logger.warning(f"Unauthorized access attempt to remediation endpoint. Provided key: '{x_api_key}'")
+            raise HTTPException(status_code=401, detail="Unauthorized: Invalid or missing X-API-Key header.")
+    return True
 
 
 class ApprovalRequest(BaseModel):
@@ -142,7 +159,6 @@ def get_incidents_list() -> List[Dict[str, Any]]:
     """Returns all recorded pipeline incidents."""
     incidents = list_incidents()
     if not incidents:
-        # Check active diagnosis engine
         diag_engine = DiagnosisEngine()
         inc = diag_engine.diagnose_active_pipeline()
         return [inc.model_dump()]
@@ -154,7 +170,6 @@ def get_incident_detail(incident_id: str) -> Dict[str, Any]:
     """Returns specific incident by ID."""
     inc = get_incident_by_id(incident_id)
     if not inc:
-        # Fallback to active diagnosis
         diag_engine = DiagnosisEngine()
         inc = diag_engine.diagnose_active_pipeline()
     return inc.model_dump()
@@ -167,7 +182,6 @@ def investigate_incident(incident_id: str) -> Dict[str, Any]:
         agent = DataOpsAgent()
         diagnosis = agent.investigate(incident_id)
         
-        # Formulate and register remediation plan automatically
         plan = planner.create_plan_from_diagnosis(diagnosis)
         approval_service.register_plan(plan)
 
@@ -205,14 +219,14 @@ def get_remediation_plan(incident_id: str) -> Dict[str, Any]:
     return target_plan.model_dump()
 
 
-@router.post("/incidents/{incident_id}/approve")
+@router.post("/incidents/{incident_id}/approve", dependencies=[Depends(verify_authorization)])
 def approve_remediation_plan(incident_id: str, req: ApprovalRequest) -> Dict[str, Any]:
-    """Human operator approves remediation plan."""
+    """Human operator approves remediation plan (Requires X-API-Key header if API_SECRET_KEY is set)."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
     
     if not target_plan:
-        raise HTTPException(status_code=44, detail=f"No plan found for incident '{incident_id}'")
+        raise HTTPException(status_code=404, detail=f"No plan found for incident '{incident_id}'")
 
     try:
         approved_plan = approval_service.approve_plan(target_plan.plan_id, approver=req.approver)
@@ -221,9 +235,9 @@ def approve_remediation_plan(incident_id: str, req: ApprovalRequest) -> Dict[str
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/incidents/{incident_id}/reject")
+@router.post("/incidents/{incident_id}/reject", dependencies=[Depends(verify_authorization)])
 def reject_remediation_plan(incident_id: str, req: RejectionRequest) -> Dict[str, Any]:
-    """Human operator rejects remediation plan."""
+    """Human operator rejects remediation plan (Requires X-API-Key header if API_SECRET_KEY is set)."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
     
@@ -237,9 +251,9 @@ def reject_remediation_plan(incident_id: str, req: RejectionRequest) -> Dict[str
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/incidents/{incident_id}/execute")
+@router.post("/incidents/{incident_id}/execute", dependencies=[Depends(verify_authorization)])
 def execute_remediation_plan(incident_id: str) -> Dict[str, Any]:
-    """Executes approved allowlisted remediation plan."""
+    """Executes approved allowlisted remediation plan (Requires X-API-Key header if API_SECRET_KEY is set)."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
     

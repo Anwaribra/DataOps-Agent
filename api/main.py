@@ -1,4 +1,5 @@
 import logging
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router
@@ -12,10 +13,16 @@ app = FastAPI(
     version="1.0.0-MCP"
 )
 
-# Enable CORS for Next.js web application
+# Configurable CORS origins for production deployment
+raw_cors = os.getenv("CORS_ALLOWED_ORIGINS", "*")
+if raw_cors == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows Next.js web UI from any host/port
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,6 +36,7 @@ def root_endpoint():
     return {
         "service": "DataOps Agent Platform API",
         "status": "RUNNING",
+        "health_check": "/api/health",
         "docs": "/docs",
         "version": "1.0.0-MCP"
     }
