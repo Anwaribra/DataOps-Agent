@@ -217,10 +217,86 @@ class OpenAILLMProvider(LLMProvider):
             return FakeLLMProvider().generate(messages, tools)
 
 
+class OpenRouterLLMProvider(LLMProvider):
+    """
+    OpenRouter API Provider using OpenAI-compatible API client.
+    Supports tool calling, structured outputs, and custom models via https://openrouter.ai/api/v1.
+    """
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        base_url: Optional[str] = None
+    ):
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("LLM_API_KEY")
+        self.model = model or os.getenv("OPENROUTER_MODEL") or os.getenv("LLM_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+        self.base_url = base_url or os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+
+    def generate(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> LLMResponse:
+        if not self.api_key or self.api_key.startswith("mock"):
+            logger.warning("No valid OpenRouter API key provided. Falling back to FakeLLMProvider.")
+            return FakeLLMProvider().generate(messages, tools)
+
+        try:
+            import openai
+            client = openai.OpenAI(
+                api_key=self.api_key,
+                base_url=self.base_url,
+                default_headers={
+                    "HTTP-Referer": "https://dataops-agent.local",
+                    "X-Title": "DataOps Agent Platform"
+                }
+            )
+
+            formatted_tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t.get("name"),
+                        "description": t.get("description"),
+                        "parameters": t.get("parameters", {"type": "object", "properties": {}})
+                    }
+                }
+                for t in tools
+            ] if tools else None
+
+            logger.info(f"Dispatching query to OpenRouter API (Model: '{self.model}')...")
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                tools=formatted_tools,
+                temperature=0.0
+            )
+
+            msg = response.choices[0].message
+            tool_calls = []
+            if msg.tool_calls:
+                for tc in msg.tool_calls:
+                    try:
+                        args = json.loads(tc.function.arguments)
+                    except Exception:
+                        args = {}
+                    tool_calls.append(LLMToolCall(id=tc.id, name=tc.function.name, arguments=args))
+
+            return LLMResponse(
+                content=msg.content,
+                tool_calls=tool_calls,
+                finish_reason=response.choices[0].finish_reason
+            )
+        except Exception as e:
+            logger.error(f"OpenRouter LLM provider call failed: {e}. Falling back to FakeLLMProvider.")
+            return FakeLLMProvider().generate(messages, tools)
+
+
 def get_llm_provider() -> LLMProvider:
     provider_name = os.getenv("LLM_PROVIDER", "fake").lower()
-    if provider_name == "fake" or os.getenv("OPENAI_API_KEY", "").startswith("mock"):
-        return FakeLLMProvider()
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+
+    if provider_name == "openrouter" or (openrouter_key and not openrouter_key.startswith("mock") and provider_name != "fake"):
+        return OpenRouterLLMProvider()
     elif provider_name in ("openai", "generic"):
         return OpenAILLMProvider()
+    elif provider_name == "fake":
+        return FakeLLMProvider()
+
     return FakeLLMProvider()

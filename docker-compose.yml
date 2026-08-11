@@ -50,7 +50,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-dataops}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops123}
       POSTGRES_DB: ${POSTGRES_DB:-dataops_db}
-      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openrouter}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       API_SECRET_KEY: ${API_SECRET_KEY:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-*}
