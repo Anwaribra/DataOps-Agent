@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Play, RotateCcw, Sun, Moon, ShieldCheck, Activity } from 'lucide-react';
+import { Play, RotateCcw, Sun, Moon, ShieldCheck, Activity, Radio } from 'lucide-react';
 import { useDemo } from '../context/DemoContext';
 import { useTheme } from '../context/ThemeContext';
 
 export const Topbar: React.FC = () => {
-  const { simulationState, runDemoIncident, resetDemo, metrics } = useDemo();
+  const { simulationState, runDemoIncident, resetDemo, metrics, isLiveMode } = useDemo();
   const { theme, toggleTheme } = useTheme();
 
   const isSimulating = simulationState !== 'HEALTHY' && simulationState !== 'RESOLVED';
@@ -47,10 +47,12 @@ export const Topbar: React.FC = () => {
           </span>
         </div>
 
-        {/* Demo Indicator */}
+        {/* Live vs Sandbox Indicator Badge */}
         <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-600 dark:text-slate-300">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span className="text-[11px]">DEMO / SANDBOX</span>
+          <span className={`w-2 h-2 rounded-full ${isLiveMode ? 'bg-sky-500 animate-pulse' : 'bg-emerald-500'}`} />
+          <span className="text-[11px] font-semibold">
+            {isLiveMode ? '● LIVE PROJECT' : '● DEMO / SANDBOX'}
+          </span>
         </div>
 
         {/* Theme Switcher Button */}

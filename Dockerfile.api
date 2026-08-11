@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for postgres and dbt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pyproject.toml and source files
+COPY pyproject.toml .
+COPY README.md .
+COPY api/ ./api/
+COPY agent/ ./agent/
+COPY mcp/ ./mcp/
+COPY remediation/ ./remediation/
+COPY health/ ./health/
+COPY diagnosis/ ./diagnosis/
+COPY failure_injection/ ./failure_injection/
+COPY ingestion/ ./ingestion/
+COPY cli/ ./cli/
+COPY dbt/ ./dbt/
+COPY dagster/ ./dagster/
+COPY data/ ./data/
+
+# Install python dependencies
+RUN pip install --no-cache-dir -e .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

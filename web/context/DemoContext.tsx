@@ -13,6 +13,16 @@ import {
   RemediationActionItem,
   VerificationCheckItem
 } from '../data/demoData';
+import {
+  approvePlanApi,
+  executePlanApi,
+  fetchPipelineNodes,
+  fetchSystemHealth,
+  injectScenarioApi,
+  investigateIncidentApi,
+  resetDemoApi,
+  verifyRecoveryApi
+} from '../lib/api';
 
 export type SimulationState =
   | 'HEALTHY'
@@ -51,6 +61,7 @@ interface DemoContextType {
   approvePlan: () => void;
   rejectPlan: () => void;
   resetDemo: () => void;
+  isLiveMode: boolean;
   metrics: {
     systemStatus: 'HEALTHY' | 'DEGRADED' | 'RECOVERED';
     pipelineHealth: number;
@@ -71,33 +82,57 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [incident, setIncident] = useState<IncidentItem>({ ...DEMO_INCIDENT, status: 'RESOLVED' });
   const [mcpStepsCount, setMcpStepsCount] = useState<number>(0);
   const [remediationActions, setRemediationActions] = useState<RemediationActionItem[]>(DEMO_REMEDIATION_ACTIONS);
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
 
-  // Active node reference
+  // Check live API connectivity on mount
+  useEffect(() => {
+    async function checkApi() {
+      const health = await fetchSystemHealth();
+      if (health) {
+        setIsLiveMode(true);
+        const remoteNodes = await fetchPipelineNodes();
+        if (remoteNodes) setNodes(remoteNodes);
+      }
+    }
+    checkApi();
+  }, []);
+
   const activeNode = nodes.find(n => n.id === activeNodeId) || null;
 
-  // Run Demo Incident Simulation Flow
-  const runDemoIncident = () => {
+  // Run Demo Incident Simulation Flow (API or Sandbox)
+  const runDemoIncident = async () => {
     setSimulationState('FAILURE_INJECTED');
     setActiveSection('investigation');
     setMcpStepsCount(0);
     setIncident({ ...DEMO_INCIDENT, status: 'DETECTED' });
 
-    // Update nodes to reflect failure
-    setNodes(prev =>
-      prev.map(node => {
-        if (node.id === 'dbt_transformation' || node.id === 'dagster_orchestrator') {
-          return { ...node, status: 'FAILED' };
-        }
-        if (node.id === 'health_signals') {
-          return { ...node, status: 'WARNING' };
-        }
-        return node;
-      })
-    );
+    // Call live API if connected
+    if (isLiveMode) {
+      await injectScenarioApi('null_customer_id');
+      const remoteNodes = await fetchPipelineNodes();
+      if (remoteNodes) setNodes(remoteNodes);
+    } else {
+      setNodes(prev =>
+        prev.map(node => {
+          if (node.id === 'dbt_transformation' || node.id === 'dagster_orchestrator') {
+            return { ...node, status: 'FAILED' };
+          }
+          if (node.id === 'health_signals') {
+            return { ...node, status: 'WARNING' };
+          }
+          return node;
+        })
+      );
+    }
 
     // Step sequence timer
-    setTimeout(() => {
+    setTimeout(async () => {
       setSimulationState('INVESTIGATING');
+      
+      if (isLiveMode) {
+        await investigateIncidentApi(incident.id);
+      }
+
       let currentStep = 0;
       const interval = setInterval(() => {
         currentStep += 1;
@@ -112,18 +147,30 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Human Approval Action
-  const approvePlan = () => {
+  const approvePlan = async () => {
     setSimulationState('APPROVED');
     setIncident(prev => ({ ...prev, status: 'APPROVED' }));
     
+    if (isLiveMode) {
+      await approvePlanApi(incident.id, 'HUMAN_OPERATOR');
+    }
+
     // Simulate execution timeline
-    setTimeout(() => {
+    setTimeout(async () => {
       setSimulationState('EXECUTING');
       setRemediationActions(prev => prev.map(a => ({ ...a, status: 'EXECUTING' })));
 
-      setTimeout(() => {
+      if (isLiveMode) {
+        await executePlanApi(incident.id);
+      }
+
+      setTimeout(async () => {
         setSimulationState('VERIFYING');
         setRemediationActions(prev => prev.map(a => ({ ...a, status: 'SUCCESS' })));
+
+        if (isLiveMode) {
+          await verifyRecoveryApi(incident.id);
+        }
 
         setTimeout(() => {
           setSimulationState('RESOLVED');
@@ -139,16 +186,19 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIncident(prev => ({ ...prev, status: 'DIAGNOSED' }));
   };
 
-  const resetDemo = () => {
+  const resetDemo = async () => {
     setSimulationState('HEALTHY');
     setActiveSection('overview');
     setNodes(INITIAL_PIPELINE_NODES);
     setMcpStepsCount(6);
     setIncident({ ...DEMO_INCIDENT, status: 'RESOLVED' });
     setRemediationActions(DEMO_REMEDIATION_ACTIONS.map(a => ({ ...a, status: 'PENDING' })));
+
+    if (isLiveMode) {
+      await resetDemoApi();
+    }
   };
 
-  // Dynamic system metrics based on simulation state
   const isHealthy = simulationState === 'HEALTHY' || simulationState === 'RESOLVED';
   const metrics = {
     systemStatus: isHealthy ? ('HEALTHY' as const) : ('DEGRADED' as const),
@@ -177,6 +227,7 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         approvePlan,
         rejectPlan,
         resetDemo,
+        isLiveMode,
         metrics
       }}
     >

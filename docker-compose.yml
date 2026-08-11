@@ -1,18 +1,19 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: dataops-postgres
-    restart: always
+    container_name: dataops_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-dataops_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops_password}
+      POSTGRES_USER: ${POSTGRES_USER:-dataops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops123}
       POSTGRES_DB: ${POSTGRES_DB:-dataops_db}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dataops_user} -d ${POSTGRES_DB:-dataops_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dataops} -d ${POSTGRES_DB:-dataops_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,23 +22,52 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: dataops-dagster
-    restart: always
+    container_name: dataops_dagster
+    command: dagster dev -h 0.0.0.0 -p 3000 -f dagster/definitions.py
+    ports:
+      - "3000:3000"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-dataops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops123}
       POSTGRES_DB: ${POSTGRES_DB:-dataops_db}
-      POSTGRES_USER: ${POSTGRES_USER:-dataops_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops_password}
-      POSTGRES_SCHEMA: ${POSTGRES_SCHEMA:-raw_data}
       DAGSTER_HOME: /app/dagster_home
-    ports:
-      - "${DAGSTER_PORT:-3000}:3000"
-    volumes:
-      - .:/app
     depends_on:
       postgres:
         condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: dataops_api
+    ports:
+      - "8000:8000"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-dataops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops123}
+      POSTGRES_DB: ${POSTGRES_DB:-dataops_db}
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      REMEDIATION_DRY_RUN: ${REMEDIATION_DRY_RUN:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: dataops_web
+    ports:
+      - "3001:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

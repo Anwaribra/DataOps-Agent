@@ -1,9 +1,9 @@
-.PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose mcp agent-investigate agent-tools agent-health remediation-list remediation-approve remediation-execute remediation-verify web-dev web-build
+.PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose mcp agent-investigate agent-tools agent-health remediation-list remediation-approve remediation-execute remediation-verify api-dev web-dev web-build docker-up docker-down
 
 help:
 	@echo "Available commands:"
-	@echo "  make up                  - Start Docker Compose services (Postgres, Dagster)"
-	@echo "  make down                - Stop Docker Compose services"
+	@echo "  make up                  - Start Postgres Docker container"
+	@echo "  make down                - Stop Postgres Docker container"
 	@echo "  make ingest              - Run dlt ingestion pipeline"
 	@echo "  make dbt-run             - Run dbt transformations"
 	@echo "  make dbt-test            - Run dbt data quality tests"
@@ -20,13 +20,16 @@ help:
 	@echo "  make remediation-approve - Approve remediation plan (PLAN=plan_id)"
 	@echo "  make remediation-execute - Execute approved remediation plan (PLAN=plan_id)"
 	@echo "  make remediation-verify  - Verify pipeline recovery (PLAN=plan_id)"
-	@echo "  make web-dev             - Run interactive Next.js demo website in dev mode"
+	@echo "  make api-dev             - Run FastAPI backend adapter locally"
+	@echo "  make web-dev             - Run Next.js demo web control plane locally"
 	@echo "  make web-build           - Build production Next.js demo website"
+	@echo "  make docker-up           - Build and start full multi-service stack (Postgres, Dagster, API, Web)"
+	@echo "  make docker-down         - Stop full multi-service stack"
 	@echo "  make build               - Build Docker containers"
 	@echo "  make clean               - Clean cache and temporary build files"
 
 up:
-	docker compose up -d
+	docker compose up -d postgres
 
 down:
 	docker compose down -v
@@ -79,11 +82,20 @@ remediation-execute:
 remediation-verify:
 	python3 -m agent.cli remediation verify $(PLAN)
 
+api-dev:
+	uvicorn api.main:app --reload --port 8000
+
 web-dev:
 	cd web && npm run dev
 
 web-build:
 	cd web && npm run build
+
+docker-up:
+	docker compose up -d --build
+
+docker-down:
+	docker compose down -v
 
 build:
 	docker compose build
