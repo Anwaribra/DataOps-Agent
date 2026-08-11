@@ -34,6 +34,7 @@ dev = [
 
 [project.scripts]
 dataops = "cli.main:cli"
+dataops-agent = "agent.cli:agent_cli"
 
 [tool.setuptools.packages.find]
 include = ["ingestion*", "agent*", "mcp*", "failure_injection*", "health*", "diagnosis*", "cli*"]

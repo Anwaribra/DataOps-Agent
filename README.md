@@ -55,15 +55,11 @@ Health Signals (Normalized Signal Layer & Evidence Collectors)
    ↓
 Diagnosis Engine (Deterministic Rule-Based Diagnosis)
    ↓
-==================== MCP SERVER ====================
-        │                                   │
-   Observability                         Evidence
- (Dagster / dbt / Ingestion)      (Incidents / DB Stats)
-        │                                   │
-        └─────────────────┬─────────────────┘
-                          ↓
-                  FUTURE AI AGENT
-              (COMING IN NEXT STAGE)
+MCP SERVER (17 Read-Only MCP Tools)
+   ↓
+MCP CLIENT (Tool Discovery & Execution)
+   ↓
+LLM DATAOPS AGENT (Evidence-Based Investigation & Recommendation)
 ```
 
 ---
@@ -76,7 +72,7 @@ Diagnosis Engine (Deterministic Rule-Based Diagnosis)
 - **Orchestration & Lineage**: `Dagster` (dagster-webserver, dagster-dbt)
 - **Observability & Diagnosis**: Python, `pydantic`, `click` CLI
 - **Tool Protocol**: Model Context Protocol (MCP SDK, stdio transport)
-- **Agentic Framework (Upcoming)**: Python, Configurable LLM Providers (OpenAI, Anthropic) via environment variables
+- **Agentic Framework**: Python, Configurable LLM Providers (`LLMProvider` abstraction with `FakeLLMProvider` for deterministic testing and `OpenAILLMProvider` for live model execution)
 - **Infrastructure**: Docker, Docker Compose
 - **Testing**: `pytest`
 
@@ -86,31 +82,30 @@ Diagnosis Engine (Deterministic Rule-Based Diagnosis)
 
 ```
 .
-├── mcp/                    # Model Context Protocol (MCP) Server
+├── agent/                  # AI DataOps Agent
 │   ├── __init__.py
+│   ├── agent.py            # Core investigation loop & budget management
+│   ├── client.py           # DataOpsMCPClient connecting to MCP tools
+│   ├── cli.py              # dataops-agent CLI commands (investigate, tools, health)
+│   ├── models.py           # AgentState & AgentDiagnosis Pydantic models
+│   ├── prompts.py          # SYSTEM_DATAOPS_AGENT_PROMPT & safety rules
+│   ├── provider.py         # LLMProvider abstraction & FakeLLMProvider
+│   └── tracing.py          # InvestigationTrace step recorder
+├── mcp/                    # Model Context Protocol (MCP) Server
 │   ├── context.py          # Shared application context & database pool
-│   ├── schemas.py          # Pydantic schemas for 16 MCP tools
+│   ├── schemas.py          # Pydantic schemas for 17 MCP tools
 │   ├── server.py           # FastMCP stdio server implementation
-│   └── tools/              # Categorized MCP tools
-│       ├── dagster.py      # Dagster lineage & status tools
-│       ├── dbt.py          # dbt test results & model status tools
-│       ├── incidents.py    # Incident & diagnosis tools
-│       ├── database.py     # Safe read-only database inspection tools
-│       └── ingestion.py    # dlt ingestion status & metadata tools
+│   └── tools/              # Categorized MCP tools (Dagster, dbt, Incidents, Database, Ingestion)
 ├── failure_injection/      # Failure Injection Framework (5 deterministic scenarios)
 ├── health/                 # Health Signal Layer & Evidence Collectors
 ├── diagnosis/              # Deterministic Rule-Based Diagnosis Engine
-├── cli/                    # DataOps CLI tool (dataops inject, reset, diagnose, mcp start)
-├── agent/                  # DataOps Agent LLM reasoning placeholder
+├── cli/                    # DataOps CLI tool
 ├── ingestion/              # Ingestion layer using dlt
 ├── dbt/                    # dbt project (staging, intermediate, marts & tests)
 ├── dagster/                # Dagster orchestration framework & asset checks
 ├── data/sample/            # E-commerce JSON sample datasets
 ├── docs/                   # Platform & MCP tool documentation
-│   ├── architecture.md
-│   ├── mcp.md
-│   └── incidents/
-├── tests/                  # Pytest test suite (unit, server & integration tests)
+├── tests/                  # Pytest test suite (49 unit, integration & safety tests)
 ├── docker-compose.yml      # Containerized Postgres & Dagster setup
 ├── Dockerfile              # Container definition
 ├── pyproject.toml          # Project dependencies & build config
@@ -120,30 +115,43 @@ Diagnosis Engine (Deterministic Rule-Based Diagnosis)
 
 ---
 
-## 7. Model Context Protocol (MCP) Layer
+## 7. AI DataOps Agent
 
-The platform provides a complete **MCP Tool Server** exposing 17 standardized, read-only diagnostic tools over standard I/O (`stdio`):
+The **AI DataOps Agent** operates as an autonomous operational data engineer investigating pipeline incidents through MCP tools.
 
-### Available MCP Tools
+### Why the Agent Uses MCP
+The agent communicates strictly through the MCP Client layer. Direct infrastructure access (raw SQL queries, shell commands, file modifications, or direct Dagster/dbt mutations) is disabled by design. This guarantees strict read-only governance and decoupled architecture.
 
-| Tool Group | Tools | Access Level |
-|---|---|---|
-| **Dagster** | `get_failed_assets`, `get_asset_status`, `get_asset_lineage`, `get_recent_runs`, `get_asset_checks` | Read-Only |
-| **dbt** | `get_dbt_test_results`, `get_dbt_model_status`, `get_failed_dbt_tests` | Read-Only |
-| **Incidents** | `list_incidents`, `get_incident`, `get_incident_evidence`, `get_diagnosis` | Read-Only |
-| **Database** | `get_table_stats`, `get_column_stats`, `get_recent_data_quality_stats` | Read-Only (Restricted) |
-| **Ingestion** | `get_ingestion_status`, `get_ingestion_metadata` | Read-Only |
-
-Start the MCP Server locally:
-```bash
-dataops mcp start
-# Or:
-python -m mcp.server
-```
+### Investigation Lifecycle
+1. **Receive Incident**: Initiates investigation loop with incident ID.
+2. **Tool Discovery**: MCP client dynamically connects to MCP server and retrieves available tool definitions.
+3. **Evidence-Based Investigation**: The agent reasons over missing evidence, selecting appropriate tools (e.g. `get_failed_assets`, `get_failed_dbt_tests`, `get_asset_lineage`, `get_column_stats`).
+4. **Facts vs Inferences**: Observed tool results are classified as facts, separate from model inferences and hypothesis statements.
+5. **Confidence Calculation**: Evidence agreement computes confidence levels (`HIGH`, `MEDIUM`, `LOW`).
+6. **Structured Diagnosis**: Produces an auditable report detailing root cause, impact, observed facts, and recommended actions.
+7. **Safety Boundary (Execution Halt)**: The agent halts before executing any remediation, requiring explicit human operator approval.
 
 ---
 
-## 8. How to Run Locally
+## 8. Development Roadmap
+
+### Phase 4 — Implemented
+- [x] Configurable `LLMProvider` abstraction (`FakeLLMProvider` & `OpenAILLMProvider`)
+- [x] MCP Client integration & tool discovery
+- [x] Tool-calling investigation loop
+- [x] Step and tool-call budget limits (`MAX_TOOL_CALLS=15`, `MAX_INVESTIGATION_STEPS=10`)
+- [x] Evidence-based root-cause diagnosis & impact analysis
+- [x] Investigation step tracing (`InvestigationTrace`)
+- [x] Safety boundaries (Read-only enforcement, write execution blocked)
+
+### Phase 5 — Planned
+- [ ] Human-in-the-loop approval workflow
+- [ ] Controlled remediation execution (quarantines, dbt model reruns, source batch backfills)
+- [ ] Post-remediation recovery verification
+
+---
+
+## 9. How to Run Locally
 
 ### Step 1: Environment Setup
 ```bash
@@ -162,22 +170,19 @@ make dbt-run
 make dbt-test
 ```
 
-### Step 4: Test Failure Injection, Diagnosis & MCP
+### Step 4: Inject Failure & Run AI DataOps Agent
 ```bash
 # Inject failure scenario
 dataops inject --scenario null_customer_id
 
-# Re-run ingestion & dbt test
-python -m ingestion.pipeline
-make dbt-test
+# Check agent health & discovered tools
+dataops agent health
+dataops agent tools
 
-# Diagnose failure via CLI
-dataops diagnose
+# Run AI Agent investigation
+dataops agent investigate inc_b91673ef
 
-# Start MCP Server
-dataops mcp start
-
-# Reset to healthy pipeline
+# Reset pipeline to healthy
 dataops reset
 ```
 

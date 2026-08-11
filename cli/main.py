@@ -4,6 +4,7 @@ import click
 from failure_injection.runner import SCENARIOS, get_active_scenario, set_active_scenario
 from diagnosis.engine import DiagnosisEngine, get_incident_by_id, list_incidents
 from mcp.server import start_server
+from agent.cli import agent_cli
 
 @click.group()
 def cli():
@@ -96,6 +97,9 @@ def mcp_group():
 def mcp_start_cmd():
     """Start the DataOps MCP Server on stdio transport."""
     start_server()
+
+# Add agent sub-commands under dataops agent
+cli.add_command(agent_cli, name="agent")
 
 if __name__ == "__main__":
     cli()
