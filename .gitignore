@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.local
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Dagster
+dagster_home/
+*.dagster
+.dagster/
+
+# dlt
+.dlt/
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store
+
+# Data / Local storage
+*.db
+*.sqlite

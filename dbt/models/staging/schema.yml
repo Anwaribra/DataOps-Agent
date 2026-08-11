@@ -1,0 +1,73 @@
+version: 2
+
+sources:
+  - name: raw_data
+    schema: raw_data
+    tables:
+      - name: customers
+      - name: products
+      - name: orders
+      - name: payments
+
+models:
+  - name: stg_customers
+    description: "Staging table for customer data"
+    columns:
+      - name: customer_id
+        description: "Primary key for customer"
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_products
+    description: "Staging table for product catalog"
+    columns:
+      - name: product_id
+        description: "Primary key for product"
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_orders
+    description: "Staging table for order transactions"
+    columns:
+      - name: order_id
+        description: "Primary key for order"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Foreign key referencing customers"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: status
+        description: "Current order status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['completed', 'pending', 'shipped', 'cancelled', 'refunded']
+
+  - name: stg_payments
+    description: "Staging table for order payments"
+    columns:
+      - name: payment_id
+        description: "Primary key for payment"
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: "Foreign key referencing orders"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: status
+        description: "Payment processing status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['success', 'failed', 'pending']

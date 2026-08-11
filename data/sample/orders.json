@@ -1,0 +1,42 @@
+[
+  {
+    "order_id": "ord_301",
+    "customer_id": "cust_101",
+    "order_date": "2026-02-01T09:12:00Z",
+    "status": "completed",
+    "total_amount": 169.98,
+    "payment_method": "credit_card"
+  },
+  {
+    "order_id": "ord_302",
+    "customer_id": "cust_102",
+    "order_date": "2026-02-02T11:45:00Z",
+    "status": "completed",
+    "total_amount": 349.50,
+    "payment_method": "paypal"
+  },
+  {
+    "order_id": "ord_303",
+    "customer_id": "cust_103",
+    "order_date": "2026-02-03T15:30:00Z",
+    "status": "pending",
+    "total_amount": 89.95,
+    "payment_method": "credit_card"
+  },
+  {
+    "order_id": "ord_304",
+    "customer_id": "cust_101",
+    "order_date": "2026-02-05T14:10:00Z",
+    "status": "shipped",
+    "total_amount": 199.00,
+    "payment_method": "debit_card"
+  },
+  {
+    "order_id": "ord_305",
+    "customer_id": "cust_105",
+    "order_date": "2026-02-06T18:22:00Z",
+    "status": "cancelled",
+    "total_amount": 49.99,
+    "payment_method": "credit_card"
+  }
+]

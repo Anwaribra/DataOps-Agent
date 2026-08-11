@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dataops-agent"
+version = "0.1.0"
+description = "An agentic DataOps platform monitoring data pipelines and diagnosing quality failures."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "DataOps Team" }
+]
+dependencies = [
+    "dlt[postgres]>=0.4.0",
+    "dbt-core>=1.7.0,<2.0.0",
+    "dbt-postgres>=1.7.0,<2.0.0",
+    "dagster>=1.6.0",
+    "dagster-webserver>=1.6.0",
+    "dagster-dbt>=0.22.0",
+    "psycopg2-binary>=2.9.9",
+    "sqlalchemy>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "click>=8.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.2.0",
+]
+
+[project.scripts]
+dataops = "cli.main:cli"
+
+[tool.setuptools.packages.find]
+include = ["ingestion*", "agent*", "mcp*", "failure_injection*", "health*", "diagnosis*", "cli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

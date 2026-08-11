@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dataops-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dataops_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops_password}
+      POSTGRES_DB: ${POSTGRES_DB:-dataops_db}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dataops_user} -d ${POSTGRES_DB:-dataops_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  dagster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dataops-dagster
+    restart: always
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-dataops_db}
+      POSTGRES_USER: ${POSTGRES_USER:-dataops_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dataops_password}
+      POSTGRES_SCHEMA: ${POSTGRES_SCHEMA:-raw_data}
+      DAGSTER_HOME: /app/dagster_home
+    ports:
+      - "${DAGSTER_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

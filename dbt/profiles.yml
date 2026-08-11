@@ -1,0 +1,12 @@
+dataops_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      user: "{{ env_var('POSTGRES_USER', 'dataops_user') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'dataops_password') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'dataops_db') }}"
+      schema: public
+      threads: 4

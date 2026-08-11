@@ -1,0 +1,42 @@
+[
+  {
+    "payment_id": "pay_401",
+    "order_id": "ord_301",
+    "payment_date": "2026-02-01T09:13:00Z",
+    "amount": 169.98,
+    "status": "success",
+    "payment_gateway": "stripe"
+  },
+  {
+    "payment_id": "pay_402",
+    "order_id": "ord_302",
+    "payment_date": "2026-02-02T11:46:00Z",
+    "amount": 349.50,
+    "status": "success",
+    "payment_gateway": "paypal"
+  },
+  {
+    "payment_id": "pay_403",
+    "order_id": "ord_303",
+    "payment_date": "2026-02-03T15:31:00Z",
+    "amount": 89.95,
+    "status": "pending",
+    "payment_gateway": "stripe"
+  },
+  {
+    "payment_id": "pay_404",
+    "order_id": "ord_304",
+    "payment_date": "2026-02-05T14:11:00Z",
+    "amount": 199.00,
+    "status": "success",
+    "payment_gateway": "square"
+  },
+  {
+    "payment_id": "pay_405",
+    "order_id": "ord_305",
+    "payment_date": "2026-02-06T18:23:00Z",
+    "amount": 49.99,
+    "status": "failed",
+    "payment_gateway": "stripe"
+  }
+]
