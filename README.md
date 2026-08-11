@@ -31,51 +31,39 @@ Many data engineering projects focus purely on generic streaming pipelines, dash
 
 - **Observability & Data Quality**: Catching errors early with dbt tests and Dagster asset checks.
 - **Deterministic Reliability**: Grounding diagnoses in normalized health signals and rule-based evidence before delegating to LLM reasoning.
+- **Standardized MCP Interface**: Exposing diagnostic tools via Model Context Protocol (MCP) to decouple AI reasoning from infrastructure mechanics.
 - **Controlled Operational Safety**: The agent **never** silently mutates infrastructure or data. It proposes explicit remediation plans and requires human approval before execution.
 
 ---
 
 ## 4. Architecture Overview
 
-```
-+------------------------+
-|  External Data Source  | (E-Commerce Sample JSON Datasets)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|     dlt Ingestion      | (Extract & Load into PostgreSQL)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|  PostgreSQL Raw Layer  | (raw_data.customers, orders, etc.)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|       dbt Layer        | (staging -> intermediate -> marts)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|   Dagster Orchestrator | (Asset Lineage, Asset Checks, Jobs)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|     Health Signals     | (Normalized Signal Layer & Evidence Collectors)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|    Diagnosis Engine    | (Deterministic Rule-Based Diagnosis Engine)
-+-----------+------------+
-            |
-            v
-+------------------------+
-|  MCP / DataOps Agent   | (Model Context Protocol & LLM Reasoning)
-+------------------------+
+```text
+                    DATA PLATFORM
+
+Sources (E-Commerce Sample JSON Datasets)
+   ↓
+dlt Ingestion
+   ↓
+PostgreSQL Raw Layer (raw_data)
+   ↓
+dbt Layer (staging → intermediate → marts)
+   ↓
+Dagster Orchestrator (Assets, Lineage, Asset Checks)
+   ↓
+Health Signals (Normalized Signal Layer & Evidence Collectors)
+   ↓
+Diagnosis Engine (Deterministic Rule-Based Diagnosis)
+   ↓
+==================== MCP SERVER ====================
+        │                                   │
+   Observability                         Evidence
+ (Dagster / dbt / Ingestion)      (Incidents / DB Stats)
+        │                                   │
+        └─────────────────┬─────────────────┘
+                          ↓
+                  FUTURE AI AGENT
+              (COMING IN NEXT STAGE)
 ```
 
 ---
@@ -87,8 +75,8 @@ Many data engineering projects focus purely on generic streaming pipelines, dash
 - **Transformation & Data Quality**: `dbt` (dbt-core, dbt-postgres)
 - **Orchestration & Lineage**: `Dagster` (dagster-webserver, dagster-dbt)
 - **Observability & Diagnosis**: Python, `pydantic`, `click` CLI
-- **Agentic Framework**: Python, Configurable LLM Providers (OpenAI, Anthropic) via environment variables
-- **Agent Tooling**: Model Context Protocol (MCP)
+- **Tool Protocol**: Model Context Protocol (MCP SDK, stdio transport)
+- **Agentic Framework (Upcoming)**: Python, Configurable LLM Providers (OpenAI, Anthropic) via environment variables
 - **Infrastructure**: Docker, Docker Compose
 - **Testing**: `pytest`
 
@@ -98,34 +86,31 @@ Many data engineering projects focus purely on generic streaming pipelines, dash
 
 ```
 .
-├── failure_injection/      # Failure Injection Framework
+├── mcp/                    # Model Context Protocol (MCP) Server
 │   ├── __init__.py
-│   ├── scenarios.py        # 5 deterministic failure scenario definitions
-│   ├── runner.py           # Failure injection CLI runner
-│   └── README.md
+│   ├── context.py          # Shared application context & database pool
+│   ├── schemas.py          # Pydantic schemas for 16 MCP tools
+│   ├── server.py           # FastMCP stdio server implementation
+│   └── tools/              # Categorized MCP tools
+│       ├── dagster.py      # Dagster lineage & status tools
+│       ├── dbt.py          # dbt test results & model status tools
+│       ├── incidents.py    # Incident & diagnosis tools
+│       ├── database.py     # Safe read-only database inspection tools
+│       └── ingestion.py    # dlt ingestion status & metadata tools
+├── failure_injection/      # Failure Injection Framework (5 deterministic scenarios)
 ├── health/                 # Health Signal Layer & Evidence Collectors
-│   ├── __init__.py
-│   ├── models.py           # SignalType, Severity, HealthSignal models
-│   ├── collectors.py       # Evidence collectors (failed assets, lineage, dbt results)
-│   └── aggregator.py       # Signal aggregator
 ├── diagnosis/              # Deterministic Rule-Based Diagnosis Engine
-│   ├── __init__.py
-│   ├── models.py           # Incident & IncidentStatus pydantic models
-│   ├── rules.py            # Rule definitions mapping signals to root cause & actions
-│   └── engine.py           # Diagnosis engine evaluation loop
-├── cli/                    # DataOps CLI tool
-│   ├── __init__.py
-│   └── main.py             # Click CLI commands (dataops inject, reset, diagnose, incident)
+├── cli/                    # DataOps CLI tool (dataops inject, reset, diagnose, mcp start)
 ├── agent/                  # DataOps Agent LLM reasoning placeholder
-├── mcp/                    # Model Context Protocol server placeholder
 ├── ingestion/              # Ingestion layer using dlt
-│   ├── __init__.py
-│   └── pipeline.py         # dlt pipeline with failure injection hooks
 ├── dbt/                    # dbt project (staging, intermediate, marts & tests)
 ├── dagster/                # Dagster orchestration framework & asset checks
 ├── data/sample/            # E-commerce JSON sample datasets
-├── docs/incidents/         # Detailed incident scenario documentation
-├── tests/                  # Pytest test suite (28 deterministic tests)
+├── docs/                   # Platform & MCP tool documentation
+│   ├── architecture.md
+│   ├── mcp.md
+│   └── incidents/
+├── tests/                  # Pytest test suite (unit, server & integration tests)
 ├── docker-compose.yml      # Containerized Postgres & Dagster setup
 ├── Dockerfile              # Container definition
 ├── pyproject.toml          # Project dependencies & build config
@@ -135,65 +120,30 @@ Many data engineering projects focus purely on generic streaming pipelines, dash
 
 ---
 
-## 7. Incident Detection & Diagnosis
+## 7. Model Context Protocol (MCP) Layer
 
-The platform establishes a complete, deterministic incident detection and error diagnosis framework prior to introducing AI reasoning:
+The platform provides a complete **MCP Tool Server** exposing 17 standardized, read-only diagnostic tools over standard I/O (`stdio`):
 
-### How Failures are Injected
-The platform includes a dedicated **Failure Injection Framework** (`failure_injection/`) supporting 5 deterministic, reversible, and isolated scenarios:
-- `null_customer_id`: Injects NULL values into order records.
-- `duplicate_order_id`: Injects duplicate order_id records.
-- `invalid_status`: Injects unsupported status string (`"UNKNOWN_STATUS"`).
-- `referential_integrity`: Injects order referencing a non-existent customer (`"cust_non_existent_999"`).
-- `volume_anomaly`: Injects abnormal batch volume (500+ order records).
+### Available MCP Tools
 
-Run failure injection:
+| Tool Group | Tools | Access Level |
+|---|---|---|
+| **Dagster** | `get_failed_assets`, `get_asset_status`, `get_asset_lineage`, `get_recent_runs`, `get_asset_checks` | Read-Only |
+| **dbt** | `get_dbt_test_results`, `get_dbt_model_status`, `get_failed_dbt_tests` | Read-Only |
+| **Incidents** | `list_incidents`, `get_incident`, `get_incident_evidence`, `get_diagnosis` | Read-Only |
+| **Database** | `get_table_stats`, `get_column_stats`, `get_recent_data_quality_stats` | Read-Only (Restricted) |
+| **Ingestion** | `get_ingestion_status`, `get_ingestion_metadata` | Read-Only |
+
+Start the MCP Server locally:
 ```bash
-python -m failure_injection.runner --scenario null_customer_id
-# Or via DataOps CLI:
-dataops inject --scenario null_customer_id
+dataops mcp start
+# Or:
+python -m mcp.server
 ```
-
-Reset back to healthy pipeline state:
-```bash
-dataops reset
-```
-
-### Health Signals & Evidence Collection
-When dbt tests or Dagster asset checks fail during pipeline runs, the **Health Signal Layer** (`health/`) collects evidence across:
-- **dbt Test Results**: Failed test assertions, expected vs actual values, failing row counts.
-- **Dagster Lineage & Asset Graph**: Upstream dependency graphs and asset execution statuses.
-- **Database Statistics & Ingestion Metadata**: Row count statistics, schema structures, and batch load metadata.
-
-These signals are normalized into typed `HealthSignal` records containing `SignalType`, `Severity`, `asset`, `test_name`, timestamps, and detailed error metadata.
-
-### Deterministic Diagnosis Engine
-The **Diagnosis Engine** (`diagnosis/`) evaluates active health signals against deterministic rules (`NullKeyRule`, `DuplicateOrderRule`, `InvalidStatusRule`, `ReferentialIntegrityRule`, `VolumeAnomalyRule`).
-
-For example, when a `not_null` dbt test assertion fails on `stg_orders.customer_id`, the Diagnosis Engine:
-1. Matches `NullKeyRule`.
-2. Computes a deterministic confidence score (**0.95**).
-3. Constructs a structured `Incident` object containing:
-   - **Status**: `DIAGNOSED`
-   - **Root Cause**: *"Upstream source data-quality regression introduced NULL customer_id values into batch orders."*
-   - **Impact**: *"Downstream order analytics and customer attribution models will contain incomplete customer metrics."*
-   - **Evidence**: List of failed dbt tests, target assets, and signal metadata.
-   - **Recommended Remediation**: Step-by-step actions requiring human operator review.
 
 ---
 
-## 8. Data Flow
-
-1. **Ingestion**: `ingestion/pipeline.py` reads JSON files from `data/sample/` and loads them into PostgreSQL schema `raw_data` via `dlt`.
-2. **Staging**: `stg_*` dbt models clean, type-cast, and sanitize raw fields.
-3. **Intermediate**: `int_customer_orders` aggregates metrics across customers and orders.
-4. **Marts**: `fct_orders`, `dim_customers`, and `dim_products` form the star-schema analytics layer.
-5. **Orchestration**: Dagster triggers and monitors the end-to-end asset execution graph and executes asset quality checks.
-6. **Health Aggregation & Diagnosis**: `health/aggregator.py` collects signals and `diagnosis/engine.py` generates the incident diagnosis report.
-
----
-
-## 9. How to Run Locally
+## 8. How to Run Locally
 
 ### Step 1: Environment Setup
 ```bash
@@ -212,17 +162,20 @@ make dbt-run
 make dbt-test
 ```
 
-### Step 4: Test Failure Injection & Diagnosis
+### Step 4: Test Failure Injection, Diagnosis & MCP
 ```bash
-# Inject failure
+# Inject failure scenario
 dataops inject --scenario null_customer_id
 
 # Re-run ingestion & dbt test
 python -m ingestion.pipeline
 make dbt-test
 
-# Diagnose failure
+# Diagnose failure via CLI
 dataops diagnose
+
+# Start MCP Server
+dataops mcp start
 
 # Reset to healthy pipeline
 dataops reset

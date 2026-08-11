@@ -68,25 +68,6 @@ def get_recent_runs(asset_name: str) -> List[Dict[str, Any]]:
 
 
 def get_dbt_test_results() -> List[Dict[str, Any]]:
-    results_file = DBT_TARGET_DIR / "run_results.json"
-    if results_file.exists():
-        try:
-            with open(results_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                tests = []
-                for res in data.get("results", []):
-                    if res.get("unique_id", "").startswith("test."):
-                        tests.append({
-                            "test_name": res.get("unique_id"),
-                            "status": res.get("status"),
-                            "failures": res.get("failures", 0),
-                            "execution_time": res.get("execution_time", 0)
-                        })
-                return tests
-        except Exception as e:
-            logger.warning(f"Could not parse dbt run_results.json: {e}")
-
-    # Fallback / Simulated test results based on active scenario if dbt output not present
     scenario = get_active_scenario()
     if scenario == "null_customer_id":
         return [{
@@ -116,6 +97,24 @@ def get_dbt_test_results() -> List[Dict[str, Any]]:
             "failures": 1,
             "message": "Found 1 order referencing non-existent customer_id 'cust_non_existent_999'"
         }]
+
+    results_file = DBT_TARGET_DIR / "run_results.json"
+    if results_file.exists():
+        try:
+            with open(results_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                tests = []
+                for res in data.get("results", []):
+                    if res.get("unique_id", "").startswith("test."):
+                        tests.append({
+                            "test_name": res.get("unique_id"),
+                            "status": res.get("status"),
+                            "failures": res.get("failures", 0),
+                            "execution_time": res.get("execution_time", 0)
+                        })
+                return tests
+        except Exception as e:
+            logger.warning(f"Could not parse dbt run_results.json: {e}")
 
     return []
 

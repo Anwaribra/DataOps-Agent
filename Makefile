@@ -1,4 +1,4 @@
-.PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose
+.PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose mcp
 
 help:
 	@echo "Available commands:"
@@ -12,6 +12,7 @@ help:
 	@echo "  make inject     - Inject failure scenario (e.g. make inject SCENARIO=null_customer_id)"
 	@echo "  make reset      - Reset failure scenarios to HEALTHY state"
 	@echo "  make diagnose   - Run DataOps diagnosis engine"
+	@echo "  make mcp        - Start DataOps MCP Server"
 	@echo "  make build      - Build Docker containers"
 	@echo "  make clean      - Clean cache and temporary build files"
 
@@ -44,6 +45,9 @@ reset:
 
 diagnose:
 	python3 -m cli.main diagnose
+
+mcp:
+	python3 -m mcp.server
 
 build:
 	docker compose build

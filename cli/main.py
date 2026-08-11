@@ -3,6 +3,7 @@ import sys
 import click
 from failure_injection.runner import SCENARIOS, get_active_scenario, set_active_scenario
 from diagnosis.engine import DiagnosisEngine, get_incident_by_id, list_incidents
+from mcp.server import start_server
 
 @click.group()
 def cli():
@@ -85,6 +86,16 @@ def diagnose_cmd(incident_id):
     for act in incident.recommended_actions:
         click.echo(f"  - {act}")
     click.echo("=" * 60 + "\n")
+
+@cli.group("mcp")
+def mcp_group():
+    """Model Context Protocol (MCP) server commands."""
+    pass
+
+@mcp_group.command("start")
+def mcp_start_cmd():
+    """Start the DataOps MCP Server on stdio transport."""
+    start_server()
 
 if __name__ == "__main__":
     cli()
