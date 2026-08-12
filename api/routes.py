@@ -20,7 +20,7 @@ router = APIRouter()
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-def verify_authorization(x_api_key: Optional[str] = Security(api_key_header)):
+async def verify_authorization(x_api_key: Optional[str] = Security(api_key_header)):
     """
     Lightweight authorization dependency verifying X-API-Key for state-mutating endpoints.
     Enforces API_SECRET_KEY if configured in environment variables.
@@ -47,7 +47,7 @@ class ScenarioInjectRequest(BaseModel):
 
 
 @router.get("/health")
-def get_system_health() -> Dict[str, Any]:
+async def get_system_health() -> Dict[str, Any]:
     """Returns platform health summary and active failure injection scenario."""
     failed_assets = collectors.get_failed_assets()
     dbt_tests = collectors.get_dbt_test_results()
@@ -67,7 +67,7 @@ def get_system_health() -> Dict[str, Any]:
 
 
 @router.get("/pipeline")
-def get_pipeline_nodes() -> List[Dict[str, Any]]:
+async def get_pipeline_nodes() -> List[Dict[str, Any]]:
     """Returns pipeline stage nodes with real runtime statuses."""
     failed_assets = collectors.get_failed_assets()
     dbt_tests = collectors.get_dbt_test_results()
@@ -155,7 +155,7 @@ def get_pipeline_nodes() -> List[Dict[str, Any]]:
 
 
 @router.get("/incidents")
-def get_incidents_list() -> List[Dict[str, Any]]:
+async def get_incidents_list() -> List[Dict[str, Any]]:
     """Returns all recorded pipeline incidents."""
     incidents = list_incidents()
     if not incidents:
@@ -166,7 +166,7 @@ def get_incidents_list() -> List[Dict[str, Any]]:
 
 
 @router.get("/incidents/{incident_id}")
-def get_incident_detail(incident_id: str) -> Dict[str, Any]:
+async def get_incident_detail(incident_id: str) -> Dict[str, Any]:
     """Returns specific incident by ID."""
     inc = get_incident_by_id(incident_id)
     if not inc:
@@ -176,7 +176,7 @@ def get_incident_detail(incident_id: str) -> Dict[str, Any]:
 
 
 @router.get("/incidents/{incident_id}/investigation")
-def investigate_incident(incident_id: str) -> Dict[str, Any]:
+async def investigate_incident(incident_id: str) -> Dict[str, Any]:
     """Executes AI DataOps Agent investigation over MCP tools and returns diagnosis trace."""
     try:
         agent = DataOpsAgent()
@@ -197,7 +197,7 @@ def investigate_incident(incident_id: str) -> Dict[str, Any]:
 
 
 @router.get("/incidents/{incident_id}/diagnosis")
-def get_incident_diagnosis(incident_id: str) -> Dict[str, Any]:
+async def get_incident_diagnosis(incident_id: str) -> Dict[str, Any]:
     """Returns diagnosis for incident."""
     agent = DataOpsAgent()
     diagnosis = agent.investigate(incident_id)
@@ -205,7 +205,7 @@ def get_incident_diagnosis(incident_id: str) -> Dict[str, Any]:
 
 
 @router.get("/incidents/{incident_id}/remediation")
-def get_remediation_plan(incident_id: str) -> Dict[str, Any]:
+async def get_remediation_plan(incident_id: str) -> Dict[str, Any]:
     """Returns registered remediation plan for incident."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
@@ -220,7 +220,7 @@ def get_remediation_plan(incident_id: str) -> Dict[str, Any]:
 
 
 @router.post("/incidents/{incident_id}/approve", dependencies=[Depends(verify_authorization)])
-def approve_remediation_plan(incident_id: str, req: ApprovalRequest) -> Dict[str, Any]:
+async def approve_remediation_plan(incident_id: str, req: ApprovalRequest) -> Dict[str, Any]:
     """Human operator approves remediation plan (Requires X-API-Key header if API_SECRET_KEY is set)."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
@@ -236,7 +236,7 @@ def approve_remediation_plan(incident_id: str, req: ApprovalRequest) -> Dict[str
 
 
 @router.post("/incidents/{incident_id}/reject", dependencies=[Depends(verify_authorization)])
-def reject_remediation_plan(incident_id: str, req: RejectionRequest) -> Dict[str, Any]:
+async def reject_remediation_plan(incident_id: str, req: RejectionRequest) -> Dict[str, Any]:
     """Human operator rejects remediation plan (Requires X-API-Key header if API_SECRET_KEY is set)."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
@@ -252,7 +252,7 @@ def reject_remediation_plan(incident_id: str, req: RejectionRequest) -> Dict[str
 
 
 @router.post("/incidents/{incident_id}/execute", dependencies=[Depends(verify_authorization)])
-def execute_remediation_plan(incident_id: str) -> Dict[str, Any]:
+async def execute_remediation_plan(incident_id: str) -> Dict[str, Any]:
     """Executes approved allowlisted remediation plan (Requires X-API-Key header if API_SECRET_KEY is set)."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
@@ -272,7 +272,7 @@ def execute_remediation_plan(incident_id: str) -> Dict[str, Any]:
 
 
 @router.post("/incidents/{incident_id}/verify")
-def verify_incident_recovery(incident_id: str) -> Dict[str, Any]:
+async def verify_incident_recovery(incident_id: str) -> Dict[str, Any]:
     """Verifies pipeline recovery after remediation execution."""
     plans = approval_service.list_plans()
     target_plan = next((p for p in plans if p.incident_id == incident_id), None)
@@ -288,7 +288,7 @@ def verify_incident_recovery(incident_id: str) -> Dict[str, Any]:
 
 
 @router.post("/demo/inject")
-def inject_demo_scenario(req: ScenarioInjectRequest) -> Dict[str, Any]:
+async def inject_demo_scenario(req: ScenarioInjectRequest) -> Dict[str, Any]:
     """Injects a controlled failure scenario into the pipeline."""
     set_active_scenario(req.scenario)
     diag_engine = DiagnosisEngine()
@@ -301,7 +301,7 @@ def inject_demo_scenario(req: ScenarioInjectRequest) -> Dict[str, Any]:
 
 
 @router.post("/demo/reset")
-def reset_demo_scenario() -> Dict[str, Any]:
+async def reset_demo_scenario() -> Dict[str, Any]:
     """Resets active failure scenarios to HEALTHY state."""
     set_active_scenario(None)
     return {"status": "HEALTHY", "active_scenario": None}

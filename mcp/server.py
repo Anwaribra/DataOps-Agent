@@ -1,21 +1,6 @@
-import sys
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-# Temporarily isolate sys.modules and sys.path to import PyPI MCPServer without collision
-saved_mcp_modules = {k: v for k, v in list(sys.modules.items()) if k == 'mcp' or k.startswith('mcp.')}
-for k in saved_mcp_modules:
-    del sys.modules[k]
-
-orig_path = sys.path[:]
-site_pkgs = [p for p in sys.path if "site-packages" in p]
-sys.path = site_pkgs + [p for p in sys.path if p not in site_pkgs]
-
-from mcp.server import MCPServer
-
-sys.path = orig_path
-sys.modules.update(saved_mcp_modules)
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 from mcp.tools.dagster import (
     get_failed_assets_tool,
@@ -54,8 +39,80 @@ from mcp.tools.remediation import (
 
 logger = logging.getLogger("dataops.mcp.server")
 
-# Initialize FastMCP / MCPServer instance
-app = MCPServer("DataOps-MCP-Server")
+
+@dataclass
+class RegisteredTool:
+    name: str
+    description: str
+    parameters: Dict[str, Any]
+    fn: Callable[..., Dict[str, Any]]
+
+
+class ToolManager:
+    def __init__(self):
+        self._tools: List[RegisteredTool] = []
+
+    def register(
+        self,
+        *,
+        name: str,
+        description: str,
+        parameters: Dict[str, Any],
+        fn: Callable[..., Dict[str, Any]]
+    ) -> None:
+        self._tools.append(
+            RegisteredTool(
+                name=name,
+                description=description,
+                parameters=parameters,
+                fn=fn
+            )
+        )
+
+    def list_tools(self) -> List[RegisteredTool]:
+        return list(self._tools)
+
+
+class DataOpsMCPServer:
+    """
+    Lightweight in-process MCP-compatible registry used by the agent and tests.
+
+    The project package is named ``mcp``, which collides with the third-party MCP
+    SDK package. Keeping the tiny registry local avoids fragile sys.modules
+    rewriting while preserving the decorator API this project uses.
+    """
+    def __init__(self, name: str):
+        self.name = name
+        self._tool_manager = ToolManager()
+
+    def tool(self, *, name: str, description: str):
+        def decorator(fn: Callable[..., Dict[str, Any]]):
+            annotations = getattr(fn, "__annotations__", {})
+            parameters = {
+                key: str(value)
+                for key, value in annotations.items()
+                if key != "return"
+            }
+            self._tool_manager.register(
+                name=name,
+                description=description,
+                parameters=parameters,
+                fn=fn
+            )
+            return fn
+
+        return decorator
+
+    def run(self, transport: str = "stdio") -> None:
+        logger.info(
+            "DataOps MCP Server '%s' ready on %s with %d registered tools.",
+            self.name,
+            transport,
+            len(self._tool_manager.list_tools())
+        )
+
+
+app = DataOpsMCPServer("DataOps-MCP-Server")
 
 # --- Register Dagster Tools ---
 @app.tool(

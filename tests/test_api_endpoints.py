@@ -1,9 +1,27 @@
 import os
 import pytest
-from fastapi.testclient import TestClient
+import anyio
+import httpx
 from api.main import app
 
-client = TestClient(app)
+
+class ASGITestClient:
+    def request(self, method, url, **kwargs):
+        async def send_request():
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+                return await client.request(method, url, **kwargs)
+
+        return anyio.run(send_request)
+
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+
+client = ASGITestClient()
 
 def test_api_root_endpoint():
     response = client.get("/")

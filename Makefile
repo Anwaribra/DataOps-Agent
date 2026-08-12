@@ -1,3 +1,6 @@
+PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
+PYTEST ?= $(shell test -x .venv/bin/pytest && echo .venv/bin/pytest || echo pytest)
+
 .PHONY: help up down ingest dbt-run dbt-test dagster test build clean inject reset diagnose mcp agent-investigate agent-tools agent-health remediation-list remediation-approve remediation-execute remediation-verify api-dev web-dev web-build docker-up docker-down
 
 help:
@@ -35,7 +38,7 @@ down:
 	docker compose down -v
 
 ingest:
-	python3 -m ingestion.pipeline
+	$(PYTHON) -m ingestion.pipeline
 
 dbt-run:
 	cd dbt && dbt run --profiles-dir .
@@ -47,40 +50,40 @@ dagster:
 	dagster dev -f dagster/definitions.py
 
 test:
-	pytest tests/ -v
+	$(PYTEST) tests/ -v
 
 inject:
-	python3 -m failure_injection.runner --scenario $(SCENARIO)
+	$(PYTHON) -m failure_injection.runner --scenario $(SCENARIO)
 
 reset:
-	python3 -m failure_injection.runner --reset
+	$(PYTHON) -m failure_injection.runner --reset
 
 diagnose:
-	python3 -m cli.main diagnose
+	$(PYTHON) -m cli.main diagnose
 
 mcp:
-	python3 -m mcp.server
+	$(PYTHON) -m mcp.server
 
 agent-investigate:
-	python3 -m agent.cli investigate $(or $(INCIDENT),inc_b91673ef)
+	$(PYTHON) -m agent.cli investigate $(or $(INCIDENT),inc_b91673ef)
 
 agent-tools:
-	python3 -m agent.cli tools
+	$(PYTHON) -m agent.cli tools
 
 agent-health:
-	python3 -m agent.cli health
+	$(PYTHON) -m agent.cli health
 
 remediation-list:
-	python3 -m agent.cli remediation list
+	$(PYTHON) -m agent.cli remediation list
 
 remediation-approve:
-	python3 -m agent.cli remediation approve $(PLAN)
+	$(PYTHON) -m agent.cli remediation approve $(PLAN)
 
 remediation-execute:
-	python3 -m agent.cli remediation execute $(PLAN)
+	$(PYTHON) -m agent.cli remediation execute $(PLAN)
 
 remediation-verify:
-	python3 -m agent.cli remediation verify $(PLAN)
+	$(PYTHON) -m agent.cli remediation verify $(PLAN)
 
 api-dev:
 	uvicorn api.main:app --reload --port 8000
