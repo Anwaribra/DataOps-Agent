@@ -25,7 +25,7 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 ## 2. End-to-End System Architecture
 
 ```text
-                                OpenShip / Docker Compose
+                              Local / Docker Compose
                                            │
                      ┌─────────────────────┴─────────────────────┐
                      │                                           │
@@ -58,8 +58,8 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 - **Agentic Engine**: Python, Configurable `LLMProvider` (`FakeLLMProvider` for deterministic testing & `OpenAILLMProvider` for live OpenAI calls)
 - **Remediation Engine**: Allowlisted execution, `ApprovalService` (30m TTL & self-approval block), `RemediationExecutor`, and `RecoveryVerifier`
 - **Backend Adapter**: FastAPI (`api/main.py`), Uvicorn
-- **Web Control Plane**: Next.js 15, TypeScript, Tailwind CSS, Lucide icons, Dark/Light mode theme engine (`web/`)
-- **Testing**: `pytest` (64 unit, integration, API, and safety tests)
+- **Web Control Plane**: Next.js 16, TypeScript, Tailwind CSS, Lucide icons, Dark/Light mode theme engine (`web/`)
+- **Testing**: `pytest` (69 unit, integration, API, and safety tests)
 
 ---
 
@@ -68,21 +68,30 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 The repository includes a modern web operational control plane located in `web/`:
 
 - **Live Mode**: Connects directly to the FastAPI backend adapter (`http://localhost:8000/api`) to display live pipeline nodes, incident logs, MCP investigation steps, and execution status.
-- **Demo / Sandbox Mode**: Provides a deterministic sandbox simulation for public web deployments where backend credentials are isolated.
+- **Demo / Sandbox Mode**: Provides a deterministic sandbox simulation for public portfolio deployments where backend credentials are isolated.
 - **Design Philosophy**: Built using the rounded design system and dark-first visual language of the **Ayn platform** (`https://aynplatform.app/`).
 
 ---
 
-## 5. OpenShip & Multi-Service Deployment
+## 5. Portfolio Demo & Multi-Service Deployment
 
-The platform is configured for multi-service deployment on OpenShip or Docker Compose:
+The project can be presented in two useful ways:
+
+1. **Portfolio Demo Page**: Deploy only the `web/` Next.js app in Demo / Sandbox Mode. This is the best option for a public portfolio because visitors can explore the product experience without needing database, Dagster, or API credentials.
+2. **Full Local Stack**: Run the full Docker Compose environment when you want the backend, Postgres, Dagster, MCP tools, and remediation flow working together.
 
 | Service | Technology | Port | Description |
 |---|---|---|---|
 | `postgres` | PostgreSQL 16 | 5433:5432 | Primary relational store (`raw_data`, `staging`, `intermediate`, `marts`) |
 | `dagster` | Dagster 1.6+ | 3000:3000 | Software-defined asset orchestrator & lineage UI |
 | `api` | FastAPI / Uvicorn | 8000:8000 | REST API adapter exposing system state & remediation endpoints |
-| `web` | Next.js 15 | 3001:3000 | Production Next.js operational control center |
+| `web` | Next.js 16 | 3001:3000 | Portfolio-ready operational control center |
+
+Build the public portfolio demo:
+```bash
+cd web
+npm run build
+```
 
 Start the full stack with Docker Compose:
 ```bash

@@ -31,7 +31,7 @@ export const Footer: React.FC = () => {
       <div className="pt-4 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] text-slate-400 font-medium">Built with:</span>
-          {['Python 3.11', 'dlt', 'PostgreSQL 16', 'dbt-core', 'Dagster', 'MCP SDK', 'Next.js 15', 'Tailwind CSS'].map(tech => (
+          {['Python 3.11', 'dlt', 'PostgreSQL 16', 'dbt-core', 'Dagster', 'MCP SDK', 'Next.js 16', 'Tailwind CSS'].map(tech => (
             <span key={tech} className="px-2 py-0.5 text-[10px] font-mono rounded-md bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
               {tech}
             </span>
