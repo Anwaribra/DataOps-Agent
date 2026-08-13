@@ -28,26 +28,6 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 
 ![DataOps Agent Architecture](docs/dataops_architecture.png)
 
-```text
-                               Local / Docker Compose
-                                           │
-                     ┌─────────────────────┴─────────────────────┐
-                     │                                           │
-               Next.js Web UI                              FastAPI Backend
-             (web/ : Port 3000)                           (api/ : Port 8000)
-                     │                                           │
-                     │          ┌────────────────────────────────┼────────────────────────────────┐
-                     │          │                                │                                │
-                     │   PostgreSQL (5433)                Dagster (3000)                     MCP Server
-                     │          │                                │                                │
-                     │          └────────────────────────────────┼────────────────────────────────┘
-                     │                                           │
-                     │                                     DataOps Agent
-                     │                                           │
-                     │                                    Remediation Engine
-                     │                                           │
-                     └───────────────────── REST API ────────────┘
-```
 
 ---
 
