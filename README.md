@@ -26,6 +26,8 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 
 ## 2. End-to-End System Architecture
 
+![DataOps Agent Architecture](docs/dataops_architecture.png)
+
 ```text
                                Local / Docker Compose
                                            │
