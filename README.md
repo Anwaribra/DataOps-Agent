@@ -2,6 +2,8 @@
 
 An agentic DataOps platform that monitors batch data pipelines, diagnoses data-quality failures via Model Context Protocol (MCP) tools, and executes human-approved recovery workflows.
 
+[Live Interactive Demo](https://anwarmousa.me/demo/dataops)
+
 ---
 
 ## 1. What It Does
@@ -25,7 +27,7 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 ## 2. End-to-End System Architecture
 
 ```text
-                              Local / Docker Compose
+                               Local / Docker Compose
                                            │
                      ┌─────────────────────┴─────────────────────┐
                      │                                           │
@@ -55,7 +57,7 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 - **Orchestration & Lineage**: `Dagster` (dagster-webserver, dagster-dbt)
 - **Observability & Diagnosis**: Pydantic health signal layer, deterministic diagnosis engine
 - **Tool Protocol**: Model Context Protocol (FastMCP SDK, stdio transport, 22 tools)
-- **Agentic Engine**: Python, Configurable `LLMProvider` (`FakeLLMProvider` for deterministic testing & `OpenAILLMProvider` for live OpenAI calls)
+- **Agentic Engine**: Python, Configurable `LLMProvider` (`OpenRouterLLMProvider` for live OpenRouter API reasoning, `OpenAILLMProvider`, and `FakeLLMProvider` for deterministic testing)
 - **Remediation Engine**: Allowlisted execution, `ApprovalService` (30m TTL & self-approval block), `RemediationExecutor`, and `RecoveryVerifier`
 - **Backend Adapter**: FastAPI (`api/main.py`), Uvicorn
 - **Web Control Plane**: Next.js 16, TypeScript, Tailwind CSS, Lucide icons, Dark/Light mode theme engine (`web/`)
@@ -63,10 +65,11 @@ Observe → Investigate → Diagnose → Approve → Remediate → Verify → Re
 
 ---
 
-## 4. Web Control Plane (`web/`)
+## 4. Web Control Plane & Live Interactive Demo
 
-The repository includes a modern web operational control plane located in `web/`:
+The platform features an operational web control plane:
 
+- **Live Interactive Demo**: Available at [https://anwarmousa.me/demo/dataops](https://anwarmousa.me/demo/dataops).
 - **Live Mode**: Connects directly to the FastAPI backend adapter (`http://localhost:8000/api`) to display live pipeline nodes, incident logs, MCP investigation steps, and execution status.
 - **Demo / Sandbox Mode**: Provides a deterministic sandbox simulation for public portfolio deployments where backend credentials are isolated.
 - **Design Philosophy**: Built using the rounded design system and dark-first visual language of the **Ayn platform** (`https://aynplatform.app/`).
@@ -77,7 +80,7 @@ The repository includes a modern web operational control plane located in `web/`
 
 The project can be presented in two useful ways:
 
-1. **Portfolio Demo Page**: Deploy only the `web/` Next.js app in Demo / Sandbox Mode. This is the best option for a public portfolio because visitors can explore the product experience without needing database, Dagster, or API credentials.
+1. **Portfolio Demo Page**: Access the live interactive demo at [https://anwarmousa.me/demo/dataops](https://anwarmousa.me/demo/dataops).
 2. **Full Local Stack**: Run the full Docker Compose environment when you want the backend, Postgres, Dagster, MCP tools, and remediation flow working together.
 
 | Service | Technology | Port | Description |
